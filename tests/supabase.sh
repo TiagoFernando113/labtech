@@ -22,8 +22,6 @@ create table auth.users (id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon;
 grant usage on schema public to authenticated, anon;
-alter default privileges in schema public grant all on tables to authenticated, anon;
-alter default privileges in schema public grant all on sequences to authenticated, anon;
 EOF
 for f in "$RAIZ"/supabase/migrations/*.sql; do "${SQL[@]}" < "$f"; done
 
@@ -66,8 +64,7 @@ update obras set nome = 'Oceana Torre B', versao = 1 where id = '00000000-0000-0
 select t.confere((select versao = 2 from obras), 'alteracao com versao base correta sobe para versao 2');
 select t.espera_erro($$update obras set nome = 'Atrasado', versao = 1 where id = '00000000-0000-0000-0000-0000000000a1'$$, 'LT409', 'alteracao sobre versao antiga e recusada como conflito');
 select t.espera_erro($$update obras set empresa_id = 'e0000000-0000-0000-0000-00000000000b' where id = '00000000-0000-0000-0000-0000000000a1'$$, 'LT403', 'obra nao muda de empresa');
-delete from obras;
-select t.confere((select count(*) = 1 from obras), 'delete fisico nao apaga nada');
+select t.espera_erro($$delete from obras$$, '42501', 'exclusao fisica e proibida');
 select t.confere((select count(*) = 2 and bool_and(usuario_id is not null) from auditoria), 'auditoria registrou criar e alterar com autor');
 select t.espera_erro($$insert into auditoria (empresa_id, tabela, registro_id, acao) values ('e0000000-0000-0000-0000-00000000000a', 'obras', gen_random_uuid(), 'criar')$$, '42501', 'ninguem escreve direto na auditoria');
 
