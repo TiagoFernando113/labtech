@@ -1,0 +1,46 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - name: Verificar (tipos e testes do núcleo)
+        run: npm run typecheck && npm test
+      - name: Gerar projeto Android
+        run: npx expo prebuild --platform android --no-install
+      - name: Compilar APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Publicar APK para download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk labtech.apk
+          gh release delete apk-teste --yes --cleanup-tag --repo "$GITHUB_REPOSITORY" || true
+          gh release create apk-teste labtech.apk --repo "$GITHUB_REPOSITORY" --prerelease \
+            --target "$GITHUB_SHA" --title "LABTECH (APK de teste)" \
+            --notes "Compilação automática #$GITHUB_RUN_NUMBER. Assinado com chave de teste: serve para instalar e testar, não para a loja."
