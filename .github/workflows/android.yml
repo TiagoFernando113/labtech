@@ -1,9 +1,7 @@
 name: Android APK
 
+# O LABTECH é distribuído como web app; o APK fica disponível só sob demanda.
 on:
-  push:
-    branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:

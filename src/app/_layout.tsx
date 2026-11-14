@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { SQLiteProvider, type SQLiteDatabase } from 'expo-sqlite';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
+import { ActivityIndicator, useColorScheme, View } from 'react-native';
 
 import { dbExpo } from '@/core/db/expo';
 import { migrar } from '@/core/db/migracoes';
@@ -20,8 +20,17 @@ async function prepararBanco(banco: SQLiteDatabase) {
 }
 
 function Navegacao() {
-  const { logado, t } = useApp();
+  const { logado, t, papel, estadoVinculo } = useApp();
   const tema = Cores[useColorScheme() === 'dark' ? 'dark' : 'light'];
+  // Conta logada cujo vínculo com a empresa ainda está sendo consultado pela primeira vez.
+  if (logado && !papel && estadoVinculo === 'carregando') {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.fundo }}>
+        <ActivityIndicator size="large" color={tema.primaria} />
+      </View>
+    );
+  }
+  const semEmpresa = logado && !papel;
   return (
     <Stack
       screenOptions={{
@@ -30,9 +39,13 @@ function Navegacao() {
         headerTitleStyle: { fontWeight: '800' },
         contentStyle: { backgroundColor: tema.fundo },
       }}>
-      <Stack.Protected guard={logado}>
+      <Stack.Protected guard={logado && !semEmpresa}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="obra/[id]" options={{ title: t.obras.nova, presentation: 'modal' }} />
+        <Stack.Screen name="funcionarios" options={{ title: t.funcionarios.titulo }} />
+      </Stack.Protected>
+      <Stack.Protected guard={semEmpresa}>
+        <Stack.Screen name="empresa" options={{ title: t.app.nome }} />
       </Stack.Protected>
       <Stack.Protected guard={!logado}>
         <Stack.Screen name="entrar" options={{ title: t.app.nome }} />

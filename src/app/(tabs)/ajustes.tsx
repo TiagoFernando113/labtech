@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { router } from 'expo-router';
 import { useCallback } from 'react';
 import { View } from 'react-native';
 
@@ -26,7 +27,7 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string }) {
 }
 
 export default function Ajustes() {
-  const { db, t, idioma, trocarIdioma, modoLocal, email, empresaNome, papel, dispositivoId, sair } = useApp();
+  const { db, t, idioma, trocarIdioma, modoLocal, email, empresaNome, papel, dispositivoId, sair, pode } = useApp();
   const tema = useTema();
   const versao = useConsulta(useCallback(() => versaoDoBanco(db), [db]));
 
@@ -58,6 +59,9 @@ export default function Ajustes() {
             <Linha rotulo={t.entrar.email} valor={email ?? '–'} />
             <Linha rotulo={t.ajustes.empresa} valor={empresaNome ?? '–'} />
             <Linha rotulo={t.ajustes.funcao} valor={papel ? t.papeis[papel] : t.entrar.semVinculo} />
+            {pode('funcionarios.gerenciar') ? (
+              <Botao titulo={t.funcionarios.gerenciar} icone="people" onPress={() => router.push('/funcionarios')} />
+            ) : null}
             <Botao titulo={t.ajustes.sair} icone="log-out" variante="secundario" onPress={sair} />
           </>
         )}

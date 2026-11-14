@@ -22,7 +22,12 @@ interface Vinculo {
   empresaId: string | null;
   empresaNome: string | null;
   papel: Papel | null;
+  nome: string | null;
 }
+
+/** `nenhum` = o servidor confirmou que a conta ainda não pertence a uma empresa. */
+type EstadoVinculo = 'carregando' | 'ok' | 'nenhum';
+export type ResultadoConta = 'ok' | 'confirmar_email' | 'ja_existe' | 'senha_fraca' | 'erro';
 
 interface App {
   db: Db;
@@ -39,7 +44,13 @@ interface App {
   papel: Papel | null;
   pode: (acao: Acao) => boolean;
   dispositivoId: string;
+  /** Nome do funcionário logado, quando informado. */
+  nome: string | null;
+  estadoVinculo: EstadoVinculo;
   entrar: (email: string, senha: string) => Promise<boolean>;
+  criarConta: (email: string, senha: string) => Promise<ResultadoConta>;
+  /** Primeira pessoa da empresa: cria a empresa e vira administradora. */
+  criarEmpresa: (nomeEmpresa: string, nomeUsuario: string) => Promise<boolean>;
   sair: () => Promise<void>;
 }
 
@@ -52,7 +63,7 @@ export function useApp(): App {
 }
 
 const idiomaDoAparelho = (): Idioma => (getLocales()[0]?.languageCode === 'es' ? 'es' : 'pt');
-const VAZIO: Vinculo = { usuarioId: null, empresaId: null, empresaNome: null, papel: null };
+const VAZIO: Vinculo = { usuarioId: null, empresaId: null, empresaNome: null, papel: null, nome: null };
 
 export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; aoFicarPronto: () => void }) {
   const banco = useSQLiteContext();
@@ -62,18 +73,21 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
   const [dispositivoId, setDispositivoId] = useState('');
   const [sessao, setSessao] = useState<Session | null>(null);
   const [vinculo, setVinculo] = useState<Vinculo>(VAZIO);
+  const [estadoVinculo, setEstadoVinculo] = useState<EstadoVinculo>('carregando');
+  const [recarga, setRecarga] = useState(0);
 
   // Abertura: tudo vem do aparelho, sem esperar a rede.
   useEffect(() => {
     let vivo = true;
     (async () => {
-      const [id, idi, usuarioId, empresaId, empresaNome, papel] = await Promise.all([
+      const [id, idi, usuarioId, empresaId, empresaNome, papel, nome] = await Promise.all([
         garantirDispositivoId(db, randomUUID),
         lerConfig(db, 'idioma'),
         lerConfig(db, 'usuario_id'),
         lerConfig(db, 'empresa_id'),
         lerConfig(db, 'empresa_nome'),
         lerConfig(db, 'papel'),
+        lerConfig(db, 'usuario_nome'),
       ]);
       const s = supabase ? (await supabase.auth.getSession()).data.session : null;
       if (!vivo) return;
@@ -81,7 +95,9 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
       setIdioma(idi === 'pt' || idi === 'es' ? idi : idiomaDoAparelho());
       setSessao(s);
       if (s && usuarioId === s.user.id) {
-        setVinculo({ usuarioId, empresaId, empresaNome, papel: PAPEIS.includes(papel as Papel) ? (papel as Papel) : null });
+        const p = PAPEIS.includes(papel as Papel) ? (papel as Papel) : null;
+        setVinculo({ usuarioId, empresaId, empresaNome, papel: p, nome });
+        if (p) setEstadoVinculo('ok');
       }
       setPronto(true);
       aoFicarPronto();
@@ -105,12 +121,15 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
     (async () => {
       if (!usuarioSessao) {
         setVinculo(VAZIO);
-        await Promise.all((['usuario_id', 'empresa_id', 'empresa_nome', 'papel'] as const).map((c) => gravarConfig(db, c, null)));
+        setEstadoVinculo('carregando');
+        await Promise.all(
+          (['usuario_id', 'empresa_id', 'empresa_nome', 'papel', 'usuario_nome'] as const).map((c) => gravarConfig(db, c, null)),
+        );
         return;
       }
       const { data, error } = await supabase
         .from('membros')
-        .select('empresa_id, papel, empresas(nome)')
+        .select('empresa_id, papel, nome, empresas(nome)')
         .eq('usuario_id', usuarioSessao)
         .eq('ativo', true)
         .limit(1)
@@ -122,17 +141,20 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
         empresaId: data?.empresa_id ?? null,
         empresaNome: (Array.isArray(empresa) ? empresa[0]?.nome : empresa?.nome) ?? null,
         papel: PAPEIS.includes(data?.papel) ? data?.papel : null,
+        nome: data?.nome ?? null,
       };
       setVinculo(novo);
+      setEstadoVinculo(novo.papel ? 'ok' : 'nenhum');
       await gravarConfig(db, 'usuario_id', novo.usuarioId);
       await gravarConfig(db, 'empresa_id', novo.empresaId);
       await gravarConfig(db, 'empresa_nome', novo.empresaNome);
       await gravarConfig(db, 'papel', novo.papel);
+      await gravarConfig(db, 'usuario_nome', novo.nome);
     })();
     return () => {
       vivo = false;
     };
-  }, [db, pronto, usuarioSessao]);
+  }, [db, pronto, usuarioSessao, recarga]);
 
   const trocarIdioma = useCallback(
     async (i: Idioma) => {
@@ -146,6 +168,27 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
     if (!supabase) return false;
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: senha });
     return !error;
+  }, []);
+
+  const criarConta = useCallback(async (email: string, senha: string): Promise<ResultadoConta> => {
+    if (!supabase) return 'erro';
+    const { data, error } = await supabase.auth.signUp({ email: email.trim(), password: senha });
+    if (error) {
+      if (error.code === 'user_already_exists' || error.code === 'email_exists') return 'ja_existe';
+      if (error.code === 'weak_password') return 'senha_fraca';
+      return 'erro';
+    }
+    // Com confirmação de e-mail ligada no Supabase não vem sessão (e e-mail repetido vem sem identidades).
+    if (!data.session) return data.user?.identities?.length === 0 ? 'ja_existe' : 'confirmar_email';
+    return 'ok';
+  }, []);
+
+  const criarEmpresa = useCallback(async (nomeEmpresa: string, nomeUsuario: string) => {
+    if (!supabase) return false;
+    const { error } = await supabase.rpc('criar_empresa', { nome_empresa: nomeEmpresa, nome_usuario: nomeUsuario });
+    if (error) return false;
+    setRecarga((n) => n + 1);
+    return true;
   }, []);
 
   const sair = useCallback(async () => {
@@ -175,10 +218,14 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
       papel,
       pode: (acao) => podePapel(papel, acao),
       dispositivoId,
+      nome: vinculo.nome,
+      estadoVinculo: modoLocal ? 'ok' : estadoVinculo,
       entrar,
+      criarConta,
+      criarEmpresa,
       sair,
     }),
-    [db, vinculo, dispositivoId, idioma, trocarIdioma, modoLocal, sessao, papel, entrar, sair],
+    [db, vinculo, dispositivoId, idioma, trocarIdioma, modoLocal, sessao, papel, estadoVinculo, entrar, criarConta, criarEmpresa, sair],
   );
 
   if (!pronto) return null;

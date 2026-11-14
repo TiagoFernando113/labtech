@@ -4,6 +4,10 @@ Prioridades, nesta ordem: **simples na obra**, **funciona sem internet**, **rast
 
 ## 1. Visão geral
 
+Distribuição: **web app instalável (PWA)** publicado no GitHub Pages. O mesmo código Expo gera Android/iOS nativos se um dia for preciso. Um service worker guarda o app para uso offline e fornece o isolamento de origem que o SQLite no navegador exige.
+
+Contas: o responsável cria a conta e a empresa pelo próprio sistema (`criar_empresa`); funcionários são cadastrados pelo administrador em Ajustes. Ninguém precisa abrir o painel do Supabase no dia a dia.
+
 ```
 Tela (expo-router) ──> Repositório ──> SQLite local  (fonte da verdade para a interface)
                             │

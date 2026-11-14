@@ -10,7 +10,7 @@ import { Aviso, Botao, Indicador, Tela, Texto } from '@/ui/componentes';
 import { Espaco } from '@/ui/tema';
 
 export default function Painel() {
-  const { db, t, modoLocal, pode, empresaNome, papel } = useApp();
+  const { db, t, modoLocal, pode, empresaNome, papel, nome } = useApp();
   const numeros = useConsulta(
     useCallback(async () => ({ obras: await contarObrasAtivas(db), pendentes: await contarPendentes(db) }), [db]),
   );
@@ -18,7 +18,7 @@ export default function Painel() {
   return (
     <Tela>
       <View style={{ gap: Espaco.xs }}>
-        <Texto tipo="titulo">{t.painel.ola}</Texto>
+        <Texto tipo="titulo">{nome ? `${t.painel.ola}, ${nome.split(' ')[0]}` : t.painel.ola}</Texto>
         <Texto cor="textoSuave">
           {[empresaNome, papel ? t.papeis[papel] : null].filter(Boolean).join(' · ') || t.app.subtitulo}
         </Texto>

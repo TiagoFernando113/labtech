@@ -18,7 +18,8 @@ SQL=("${COMO[@]}" "$BIN/psql" -h "$DIR" -p "$PORTA" -U postgres -v ON_ERROR_STOP
 "${SQL[@]}" <<'EOF'
 create role anon nologin; create role authenticated nologin;
 create schema auth;
-create table auth.users (id uuid primary key);
+create table auth.users (id uuid primary key, email text);
+grant select on auth.users to postgres;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon;
 grant usage on schema public to authenticated, anon;
@@ -27,7 +28,7 @@ for f in "$RAIZ"/supabase/migrations/*.sql; do "${SQL[@]}" < "$f"; done
 
 "${SQL[@]}" <<'EOF'
 \set VERBOSITY terse
-insert into auth.users values ('a0000000-0000-0000-0000-000000000001'), ('a0000000-0000-0000-0000-000000000002'),
+insert into auth.users (id) values ('a0000000-0000-0000-0000-000000000001'), ('a0000000-0000-0000-0000-000000000002'),
   ('a0000000-0000-0000-0000-000000000003'), ('b0000000-0000-0000-0000-000000000001');
 insert into empresas (id, nome) values ('e0000000-0000-0000-0000-00000000000a', 'Lab A'), ('e0000000-0000-0000-0000-00000000000b', 'Lab B');
 insert into membros (usuario_id, empresa_id, papel) values
@@ -87,10 +88,30 @@ select t.confere((select count(*) = 1 from membros), 'admin de B nao ve membros 
 update obras set nome = 'Invadida', versao = 2;
 select t.confere((select count(*) = 0 from auditoria), 'empresa B nao le auditoria da A');
 
+-- Conta nova cria a própria empresa e vira administradora; não dá para repetir nem invadir.
+reset role;
+insert into auth.users (id, email) values ('c0000000-0000-0000-0000-000000000001', 'dono@c.com'), ('c0000000-0000-0000-0000-000000000002', 'func@c.com');
+set role authenticated; set request.jwt.sub = 'c0000000-0000-0000-0000-000000000001';
+select t.confere((select count(*) = 0 from empresas), 'conta nova nao ve nenhuma empresa');
+select public.criar_empresa('  Lab C ', 'Dona C');
+select t.confere((select count(*) = 1 and bool_and(nome = 'Lab C') from empresas), 'criar_empresa cria a empresa de quem chamou');
+select t.confere((select papel = 'admin' and nome = 'Dona C' and email = 'dono@c.com' from membros), 'quem cria a empresa vira admin, com nome e e-mail');
+select t.espera_erro($$select public.criar_empresa('Outra', 'x')$$, 'LT409', 'nao cria segunda empresa');
+insert into membros (usuario_id, empresa_id, papel, nome, email) select 'c0000000-0000-0000-0000-000000000002', id, 'ajudante', 'Func', 'func@c.com' from empresas;
+select t.confere((select count(*) = 2 from membros), 'admin cadastra funcionario na propria empresa');
+select t.espera_erro($$insert into membros (usuario_id, empresa_id, papel) select 'a0000000-0000-0000-0000-000000000003', id, 'ajudante' from empresas$$, '23505', 'nao captura funcionario de outra empresa');
+update membros set papel = 'laboratorista', ativo = false where usuario_id = 'c0000000-0000-0000-0000-000000000002';
+set request.jwt.sub = 'c0000000-0000-0000-0000-000000000002';
+select t.confere((select count(*) = 0 from empresas), 'funcionario desativado perde o acesso');
+select t.espera_erro($$select public.criar_empresa('Fuga', 'x')$$, 'LT409', 'funcionario desativado nao cria outra empresa');
+set role anon; set request.jwt.sub = '';
+select t.espera_erro($$select public.criar_empresa('Anon', 'x')$$, '42501', 'anonimo nao cria empresa');
+set role authenticated; set request.jwt.sub = 'a0000000-0000-0000-0000-000000000001';
+
 -- Sem login não há acesso.
 set role anon; set request.jwt.sub = '';
 select t.espera_erro($$select * from obras$$, '42501', 'anonimo nao le obras');
 reset role;
-select t.confere((select nome = 'Oceana Torre B' and versao = 2 from obras), 'dados intactos apos todas as tentativas');
+select t.confere((select count(*) = 1 and bool_and(nome = 'Oceana Torre B' and versao = 2) from obras), 'dados intactos apos todas as tentativas');
 EOF
 echo "SUPABASE: todas as verificações passaram"

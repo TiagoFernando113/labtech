@@ -52,7 +52,8 @@
     "test": "tsx --test tests/*.test.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tests",
     "test:supabase": "bash tests/supabase.sh",
-    "test:web": "expo export -p web --output-dir dist && node tests/e2e/web.js dist dist"
+    "test:web": "EXPO_PUBLIC_SUPABASE_URL= EXPO_PUBLIC_SUPABASE_ANON_KEY= npm run build:web && node tests/e2e/web.js dist dist",
+    "build:web": "expo export -p web --output-dir dist && node scripts/pwa.mjs dist"
   },
   "private": true
 }

@@ -57,3 +57,14 @@ export const supabase: SupabaseClient | null =
         },
       })
     : null;
+
+/**
+ * Cliente sem sessão guardada, usado pelo administrador para criar a conta de um
+ * funcionário sem sair da própria conta.
+ */
+export function clienteAvulso(): SupabaseClient | null {
+  if (!url || !chave) return null;
+  return createClient(url, chave, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'labtech-avulso' },
+  });
+}
