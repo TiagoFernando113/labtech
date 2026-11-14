@@ -41,7 +41,15 @@ function Navegacao() {
       }}>
       <Stack.Protected guard={logado && !semEmpresa}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="obra/[id]" options={{ title: t.obras.nova, presentation: 'modal' }} />
+        <Stack.Screen name="obras" options={{ title: t.obras.titulo }} />
+        <Stack.Screen name="obra/[id]" options={{ title: t.obras.titulo }} />
+        <Stack.Screen name="recebimento/novo" options={{ title: t.recebimento.novo }} />
+        <Stack.Screen name="recebimento/[id]" options={{ title: t.recebimento.titulo }} />
+        <Stack.Screen name="cp/[id]" options={{ title: t.cp.titulo }} />
+        <Stack.Screen name="romper" options={{ title: t.romp.registrar }} />
+        <Stack.Screen name="tanque/[id]" options={{ title: t.tanques.titulo }} />
+        <Stack.Screen name="guardar" options={{ title: t.tanques.guardar }} />
+        <Stack.Screen name="calculadora" options={{ title: t.calc.titulo }} />
         <Stack.Screen name="funcionarios" options={{ title: t.funcionarios.titulo }} />
       </Stack.Protected>
       <Stack.Protected guard={semEmpresa}>

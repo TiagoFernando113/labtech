@@ -17,6 +17,12 @@ export const Cores = {
     perigo: '#C62828',
     sobreMarinho: '#FFFFFF',
     sobreMarinhoSuave: '#B7C6DD',
+    faixa: '#F5F8FC',
+    primariaSuave: '#E3EDFF',
+    okSuave: '#DDF3E7',
+    alertaSuave: '#FBEBCF',
+    perigoSuave: '#FBE1DE',
+    destaqueSuave: '#D6F1F7',
   },
   dark: {
     fundo: '#07122A',
@@ -33,6 +39,12 @@ export const Cores = {
     perigo: '#FF7B72',
     sobreMarinho: '#FFFFFF',
     sobreMarinhoSuave: '#B7C6DD',
+    faixa: '#0B1A38',
+    primariaSuave: '#16305F',
+    okSuave: '#123A2A',
+    alertaSuave: '#3D2F10',
+    perigoSuave: '#42201D',
+    destaqueSuave: '#0F3541',
   },
 } as const;
 

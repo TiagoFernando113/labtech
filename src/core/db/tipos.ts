@@ -29,6 +29,8 @@ export interface RegistroSync {
 /** Quem está operando o aparelho; carimbado em cada gravação. */
 export interface Contexto {
   usuarioId: string | null;
+  /** Nome de quem opera, gravado junto aos registros para leitura offline. */
+  usuarioNome?: string | null;
   empresaId: string | null;
   dispositivoId: string;
   novoId: () => string;
