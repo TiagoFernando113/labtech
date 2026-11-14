@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps, ReactNode } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -200,3 +202,324 @@ const estilos = StyleSheet.create({
   },
   aviso: { flexDirection: 'row', gap: Espaco.m, alignItems: 'center', borderRadius: Raio.m, borderWidth: 1, padding: Espaco.m },
 });
+
+// ── Elementos de sistema de laboratório: densos, legíveis e tocáveis ─────────
+
+/** Sigla da obra: o identificador visual mais importante do sistema. */
+export function Sigla({ texto, tamanho = 'm', apagada }: { texto: string; tamanho?: 'p' | 'm' | 'g'; apagada?: boolean }) {
+  const tema = useTema();
+  const d = { p: { w: 40, h: 26, f: 12 }, m: { w: 52, h: 36, f: 15 }, g: { w: 76, h: 52, f: 22 } }[tamanho];
+  return (
+    <View
+      style={{
+        minWidth: d.w,
+        height: d.h,
+        paddingHorizontal: 6,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: apagada ? tema.borda : tema.marinho,
+      }}>
+      <Text style={{ color: apagada ? tema.textoSuave : tema.sobreMarinho, fontSize: d.f, fontWeight: '800', letterSpacing: 0.5 }}>{texto}</Text>
+    </View>
+  );
+}
+
+export type Tom = 'neutro' | 'primaria' | 'ok' | 'alerta' | 'perigo' | 'destaque';
+
+export function coresDoTom(tema: Tema, tom: Tom): { fundo: string; texto: string } {
+  if (tom === 'neutro') return { fundo: tema.faixa, texto: tema.textoSuave };
+  return { fundo: tema[`${tom}Suave`], texto: tema[tom] };
+}
+
+/** Etiqueta curta de situação. */
+export function Selo({ texto, tom = 'neutro', icone }: { texto: string; tom?: Tom; icone?: NomeIcone }) {
+  const tema = useTema();
+  const c = coresDoTom(tema, tom);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: c.fundo, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start' }}>
+      {icone ? <Ionicons name={icone} size={13} color={c.texto} /> : null}
+      <Text style={{ color: c.texto, fontSize: 12, fontWeight: '700' }}>{texto}</Text>
+    </View>
+  );
+}
+
+/** Título de seção com ação opcional à direita. */
+export function Secao({ titulo, acao, aoTocar, contador }: { titulo: string; acao?: string; aoTocar?: () => void; contador?: number }) {
+  const tema = useTema();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 28 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Texto tipo="rotulo" cor="textoSuave">
+          {titulo}
+        </Texto>
+        {contador !== undefined ? (
+          <View style={{ backgroundColor: tema.borda, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 1 }}>
+            <Text style={{ color: tema.texto, fontSize: 12, fontWeight: '800' }}>{contador}</Text>
+          </View>
+        ) : null}
+      </View>
+      {acao && aoTocar ? (
+        <Pressable onPress={aoTocar} hitSlop={12} accessibilityRole="button">
+          <Text style={{ color: tema.primaria, fontSize: 14, fontWeight: '700' }}>{acao}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** Bloco de lista: linhas separadas por fio, dentro de uma única superfície. */
+export function Lista({ children, vazio }: { children?: ReactNode; vazio?: string }) {
+  const tema = useTema();
+  const itens = (Array.isArray(children) ? children.flat() : [children]).filter(Boolean);
+  return (
+    <View style={{ backgroundColor: tema.superficie, borderColor: tema.borda, borderWidth: 1, borderRadius: Raio.m, overflow: 'hidden' }}>
+      {itens.length === 0 && vazio ? (
+        <Text style={{ color: tema.textoSuave, fontSize: 14, padding: Espaco.g }}>{vazio}</Text>
+      ) : (
+        itens.map((item, i) => (
+          <View key={i} style={i > 0 ? { borderTopWidth: 1, borderTopColor: tema.borda } : undefined}>
+            {item}
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
+/** Linha de lista: algo à esquerda, título + detalhe, algo à direita. */
+export function Linha({
+  esquerda,
+  titulo,
+  detalhe,
+  direita,
+  aoTocar,
+  selecionada,
+}: {
+  esquerda?: ReactNode;
+  titulo: string;
+  detalhe?: string | null;
+  direita?: ReactNode;
+  aoTocar?: () => void;
+  selecionada?: boolean;
+}) {
+  const tema = useTema();
+  const corpo = (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Espaco.m,
+        paddingHorizontal: Espaco.m,
+        paddingVertical: 10,
+        minHeight: 52,
+        backgroundColor: selecionada ? tema.primariaSuave : undefined,
+      }}>
+      {esquerda}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ color: tema.texto, fontSize: 15, fontWeight: '700' }}>
+          {titulo}
+        </Text>
+        {detalhe ? (
+          <Text numberOfLines={2} style={{ color: tema.textoSuave, fontSize: 13, lineHeight: 18 }}>
+            {detalhe}
+          </Text>
+        ) : null}
+      </View>
+      {direita}
+      {aoTocar && !direita ? <Ionicons name="chevron-forward" size={18} color={tema.textoSuave} /> : null}
+    </View>
+  );
+  if (!aoTocar) return corpo;
+  return (
+    <Pressable onPress={aoTocar} accessibilityRole="button" style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+      {corpo}
+    </Pressable>
+  );
+}
+
+/** Indicador compacto para grades de painel. */
+export function Kpi({ valor, legenda, tom = 'neutro', aoTocar }: { valor: number | string; legenda: string; tom?: Tom; aoTocar?: () => void }) {
+  const tema = useTema();
+  const c = coresDoTom(tema, tom);
+  const ativo = tom !== 'neutro' && valor !== 0 && valor !== '–';
+  return (
+    <Pressable
+      onPress={aoTocar}
+      disabled={!aoTocar}
+      accessibilityRole={aoTocar ? 'button' : undefined}
+      accessibilityLabel={`${legenda}: ${valor}`}
+      style={({ pressed }) => ({
+        flexBasis: '30%',
+        flexGrow: 1,
+        minWidth: 96,
+        backgroundColor: ativo ? c.fundo : tema.superficie,
+        borderColor: ativo ? c.texto : tema.borda,
+        borderWidth: 1,
+        borderRadius: Raio.m,
+        paddingHorizontal: 10,
+        paddingVertical: 10,
+        opacity: pressed ? 0.7 : 1,
+      })}>
+      <Text style={{ color: ativo ? c.texto : tema.texto, fontSize: 24, lineHeight: 28, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{valor}</Text>
+      <Text numberOfLines={2} style={{ color: tema.textoSuave, fontSize: 11.5, lineHeight: 14, fontWeight: '600' }}>
+        {legenda}
+      </Text>
+    </Pressable>
+  );
+}
+
+/** Escolha única entre poucas opções, lado a lado. */
+export function Segmento<T extends string | number>({ opcoes, valor, aoMudar }: { opcoes: { valor: T; rotulo: string }[]; valor: T; aoMudar: (v: T) => void }) {
+  const tema = useTema();
+  return (
+    <View style={{ flexDirection: 'row', backgroundColor: tema.superficie, borderColor: tema.borda, borderWidth: 1, borderRadius: Raio.m, overflow: 'hidden' }}>
+      {opcoes.map((o) => {
+        const ativo = o.valor === valor;
+        return (
+          <Pressable
+            key={String(o.valor)}
+            onPress={() => aoMudar(o.valor)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ativo }}
+            style={{ flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, backgroundColor: ativo ? tema.marinho : undefined }}>
+            <Text numberOfLines={1} style={{ color: ativo ? tema.sobreMarinho : tema.textoSuave, fontSize: 14, fontWeight: '700' }}>
+              {o.rotulo}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Opções em pastilhas que quebram de linha; seleção única ou múltipla. */
+export function Pastilhas<T extends string | number>({
+  opcoes,
+  selecionadas,
+  aoTocar,
+}: {
+  opcoes: { valor: T; rotulo: string }[];
+  selecionadas: T[];
+  aoTocar: (v: T) => void;
+}) {
+  const tema = useTema();
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Espaco.p }}>
+      {opcoes.map((o) => {
+        const ativo = selecionadas.includes(o.valor);
+        return (
+          <Pressable
+            key={String(o.valor)}
+            onPress={() => aoTocar(o.valor)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: ativo }}
+            style={{
+              minHeight: 46,
+              minWidth: 56,
+              paddingHorizontal: 14,
+              borderRadius: Raio.m,
+              borderWidth: 2,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: ativo ? tema.primaria : tema.superficie,
+              borderColor: ativo ? tema.primaria : tema.borda,
+            }}>
+            <Text style={{ color: ativo ? tema.sobrePrimaria : tema.texto, fontSize: 15, fontWeight: '700' }}>{o.rotulo}</Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Menos / valor / mais: para datas e quantidades sem teclado. */
+export function Passo({ rotulo, valor, aoMenos, aoMais }: { rotulo: string; valor: string; aoMenos: () => void; aoMais: () => void }) {
+  const tema = useTema();
+  const botao = (icone: NomeIcone, onPress: () => void, nome: string) => (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${rotulo}: ${nome}`}
+      style={({ pressed }) => ({ width: 52, height: 48, alignItems: 'center', justifyContent: 'center', backgroundColor: tema.faixa, opacity: pressed ? 0.6 : 1 })}>
+      <Ionicons name={icone} size={22} color={tema.texto} />
+    </Pressable>
+  );
+  return (
+    <View style={{ gap: Espaco.xs }}>
+      <Texto tipo="pequeno" cor="textoSuave">
+        {rotulo}
+      </Texto>
+      <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: tema.superficie, borderColor: tema.borda, borderWidth: 2, borderRadius: Raio.m, overflow: 'hidden' }}>
+        {botao('remove', aoMenos, '-')}
+        <Text style={{ flex: 1, textAlign: 'center', color: tema.texto, fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{valor}</Text>
+        {botao('add', aoMais, '+')}
+      </View>
+    </View>
+  );
+}
+
+/** Par rótulo/valor para fichas. */
+export function Dado({ rotulo, valor }: { rotulo: string; valor: string | null | undefined }) {
+  return (
+    <View style={{ flexBasis: '46%', flexGrow: 1, gap: 1 }}>
+      <Texto tipo="pequeno" cor="textoSuave" style={{ fontSize: 12 }}>
+        {rotulo}
+      </Texto>
+      <Texto tipo="forte" style={{ fontSize: 15 }} selectable>
+        {valor || '–'}
+      </Texto>
+    </View>
+  );
+}
+
+/** Caixa de pesquisa. */
+export function Pesquisa({ valor, aoMudar, dica }: { valor: string; aoMudar: (t: string) => void; dica: string }) {
+  const tema = useTema();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: Espaco.p, backgroundColor: tema.superficie, borderColor: tema.borda, borderWidth: 2, borderRadius: Raio.m, paddingHorizontal: Espaco.m, minHeight: 48 }}>
+      <Ionicons name="search" size={20} color={tema.textoSuave} />
+      <TextInput
+        value={valor}
+        onChangeText={aoMudar}
+        placeholder={dica}
+        placeholderTextColor={tema.textoSuave}
+        accessibilityLabel={dica}
+        autoCapitalize="none"
+        autoCorrect={false}
+        style={[{ flex: 1, color: tema.texto, fontSize: 16, minHeight: 44 }, Platform.OS === 'web' ? ({ outlineStyle: 'none' } as object) : null]}
+      />
+      {valor ? (
+        <Pressable onPress={() => aoMudar('')} hitSlop={10} accessibilityRole="button" accessibilityLabel="×">
+          <Ionicons name="close-circle" size={20} color={tema.textoSuave} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** Miniaturas das fotos de um registro; tocar amplia. */
+export function Galeria({ fotos, aoAbrir }: { fotos: string[]; aoAbrir?: (indice: number) => void }) {
+  const tema = useTema();
+  if (!fotos.length) return null;
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Espaco.p }}>
+      {fotos.map((f, i) => (
+        <Pressable key={i} onPress={() => aoAbrir?.(i)} disabled={!aoAbrir} accessibilityRole="imagebutton">
+          <Image source={{ uri: f }} style={{ width: 84, height: 84, borderRadius: Raio.m, borderWidth: 1, borderColor: tema.borda, backgroundColor: tema.faixa }} />
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+/** Foto ampliada em tela cheia; tocar fecha. */
+export function FotoAmpliada({ foto, aoFechar }: { foto: string | null; aoFechar: () => void }) {
+  return (
+    <Modal visible={foto !== null} transparent animationType="fade" onRequestClose={aoFechar}>
+      <Pressable onPress={aoFechar} accessibilityRole="button" style={{ flex: 1, backgroundColor: 'rgba(4,10,24,0.94)', alignItems: 'center', justifyContent: 'center' }}>
+        {foto ? <Image source={{ uri: foto }} resizeMode="contain" style={{ width: '100%', height: '100%' }} /> : null}
+      </Pressable>
+    </Modal>
+  );
+}

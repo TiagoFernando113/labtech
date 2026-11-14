@@ -203,6 +203,7 @@ export function AppProvider({ children, aoFicarPronto }: { children: ReactNode; 
       db,
       ctx: {
         usuarioId: vinculo.usuarioId,
+        usuarioNome: vinculo.nome ?? sessao?.user.email?.split('@')[0] ?? null,
         empresaId: vinculo.empresaId,
         dispositivoId,
         novoId: randomUUID,
